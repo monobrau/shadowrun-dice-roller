@@ -597,18 +597,20 @@ class ShadowrunDiceRoller {
             }
         }
 
-        // Glitch detection
+        // Glitch detection (SR6E: More than half of dice are ones)
         let glitchType = null;
         if (this.settings.glitchDetection) {
             const originalDice = dice.filter(d => d.original);
-            const originalHits = originalDice.filter(d => d.value >= 5).length;
             const originalOnes = originalDice.filter(d => d.value === 1).length;
+            const halfDice = Math.floor(originalDice.length / 2);
 
-            if (originalOnes > originalHits && originalOnes > 0) {
-                glitchType = 'glitch';
-            }
+            // Critical glitch: All dice are ones
             if (originalOnes === dicePool && dicePool > 0) {
                 glitchType = 'critical-glitch';
+            }
+            // Regular glitch: More than half of dice are ones
+            else if (originalOnes > halfDice && originalOnes > 0) {
+                glitchType = 'glitch';
             }
         }
 
