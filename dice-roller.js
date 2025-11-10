@@ -9,10 +9,32 @@ class ShadowrunDiceRoller {
             enableSounds: false,
             defaultEdge: 0
         };
+        this.characterStats = {
+            attributes: {
+                body: 3,
+                agility: 3,
+                reaction: 3,
+                strength: 3,
+                willpower: 3,
+                logic: 3,
+                intuition: 3,
+                charisma: 3
+            },
+            customSkills: {},
+            poolConfig: {
+                attribute1: '',
+                attribute2: '',
+                skillName: '',
+                skillValue: 0,
+                modifier: 0
+            }
+        };
         
         this.initializeElements();
         this.loadSettings();
+        this.loadCharacterStats();
         this.attachEventListeners();
+        this.updateCalculatedPool();
     }
 
     initializeElements() {
@@ -43,6 +65,33 @@ class ShadowrunDiceRoller {
         this.edgeRerollFailuresBtn = document.getElementById('edgeRerollFailures');
         this.edgeAddDiceBtn = document.getElementById('edgeAddDice');
         this.edgePushLimitBtn = document.getElementById('edgePushLimit');
+
+        // Character stats
+        this.statsToggle = document.getElementById('statsToggle');
+        this.statsContent = document.getElementById('statsContent');
+        this.attrInputs = {
+            body: document.getElementById('attrBody'),
+            agility: document.getElementById('attrAgility'),
+            reaction: document.getElementById('attrReaction'),
+            strength: document.getElementById('attrStrength'),
+            willpower: document.getElementById('attrWillpower'),
+            logic: document.getElementById('attrLogic'),
+            intuition: document.getElementById('attrIntuition'),
+            charisma: document.getElementById('attrCharisma')
+        };
+        this.poolAttribute1 = document.getElementById('poolAttribute1');
+        this.poolAttribute2 = document.getElementById('poolAttribute2');
+        this.poolSkillSelect = document.getElementById('poolSkillSelect');
+        this.poolSkill = document.getElementById('poolSkill');
+        this.poolSkillValue = document.getElementById('poolSkillValue');
+        this.poolModifier = document.getElementById('poolModifier');
+        this.calculatedPool = document.getElementById('calculatedPool');
+        this.useCalculatedPool = document.getElementById('useCalculatedPool');
+        this.customSkillsList = document.getElementById('customSkillsList');
+        this.addSkillBtn = document.getElementById('addSkillBtn');
+        this.exportCharacterBtn = document.getElementById('exportCharacterBtn');
+        this.importCharacterBtn = document.getElementById('importCharacterBtn');
+        this.importCharacterFile = document.getElementById('importCharacterFile');
     }
 
     loadSettings() {
@@ -67,6 +116,84 @@ class ShadowrunDiceRoller {
 
     saveSettings() {
         localStorage.setItem('shadowrunDiceSettings', JSON.stringify(this.settings));
+    }
+
+    loadCharacterStats() {
+        const savedStats = localStorage.getItem('shadowrunCharacterStats');
+        if (savedStats) {
+            const parsed = JSON.parse(savedStats);
+            this.characterStats = { ...this.characterStats, ...parsed };
+        }
+
+        // Load attributes
+        Object.keys(this.characterStats.attributes).forEach(attr => {
+            if (this.attrInputs[attr]) {
+                this.attrInputs[attr].value = this.characterStats.attributes[attr];
+            }
+        });
+
+        // Load pool config
+        if (this.characterStats.poolConfig) {
+            this.poolAttribute1.value = this.characterStats.poolConfig.attribute1 || '';
+            this.poolAttribute2.value = this.characterStats.poolConfig.attribute2 || '';
+            this.poolSkill.value = this.characterStats.poolConfig.skillName || '';
+            this.poolSkillValue.value = this.characterStats.poolConfig.skillValue || 0;
+            this.poolModifier.value = this.characterStats.poolConfig.modifier || 0;
+        }
+
+        // Load custom skills
+        if (this.characterStats.customSkills) {
+            this.updateCustomSkillsDisplay();
+            this.updateSkillDropdown();
+        }
+    }
+
+    saveCharacterStats() {
+        localStorage.setItem('shadowrunCharacterStats', JSON.stringify(this.characterStats));
+    }
+
+    updateCalculatedPool() {
+        let pool = 0;
+
+        // Get attribute 1 value
+        if (this.poolAttribute1.value) {
+            const attr1Value = parseInt(this.attrInputs[this.poolAttribute1.value].value) || 0;
+            pool += attr1Value;
+        }
+
+        // Get attribute 2 or skill value
+        if (this.poolAttribute2.value) {
+            const attr2Value = parseInt(this.attrInputs[this.poolAttribute2.value].value) || 0;
+            pool += attr2Value;
+        } else if (this.poolSkillSelect.value) {
+            // Use custom skill from dropdown
+            const skillName = this.poolSkillSelect.value;
+            if (this.characterStats.customSkills[skillName]) {
+                pool += this.characterStats.customSkills[skillName];
+            }
+        } else if (this.poolSkill.value.trim()) {
+            // Check if it's a custom skill (by name match)
+            const skillName = this.poolSkill.value.trim().toLowerCase();
+            if (this.characterStats.customSkills[skillName]) {
+                pool += this.characterStats.customSkills[skillName];
+            } else {
+                // Use manual skill value
+                pool += parseInt(this.poolSkillValue.value) || 0;
+            }
+        }
+
+        // Add modifier
+        pool += parseInt(this.poolModifier.value) || 0;
+
+        // Ensure minimum of 0
+        pool = Math.max(0, pool);
+
+        this.calculatedPool.textContent = pool;
+
+        // Update dice pool input if "Use Calculated Pool" is checked
+        if (this.useCalculatedPool.checked) {
+            this.dicePoolInput.value = pool;
+        }
     }
 
     attachEventListeners() {
@@ -121,10 +248,292 @@ class ShadowrunDiceRoller {
         this.edgePointsInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.rollDice();
         });
+
+        // Character stats toggle
+        this.statsToggle.addEventListener('click', () => {
+            const isExpanded = this.statsContent.getAttribute('aria-expanded') === 'true';
+            const newState = !isExpanded;
+            this.statsContent.style.display = newState ? 'block' : 'none';
+            this.statsContent.setAttribute('aria-expanded', newState);
+            this.statsToggle.setAttribute('aria-expanded', newState);
+        });
+
+        // Attribute inputs
+        Object.keys(this.attrInputs).forEach(attr => {
+            this.attrInputs[attr].addEventListener('input', (e) => {
+                this.characterStats.attributes[attr] = parseInt(e.target.value) || 0;
+                this.saveCharacterStats();
+                this.updateCalculatedPool();
+            });
+        });
+
+        // Pool configuration inputs
+        this.poolAttribute1.addEventListener('change', () => {
+            this.characterStats.poolConfig.attribute1 = this.poolAttribute1.value;
+            this.saveCharacterStats();
+            this.updateCalculatedPool();
+        });
+
+        this.poolAttribute2.addEventListener('change', () => {
+            this.characterStats.poolConfig.attribute2 = this.poolAttribute2.value;
+            if (this.poolAttribute2.value) {
+                // Clear skill inputs when attribute is selected
+                this.poolSkillSelect.value = '';
+                this.poolSkill.value = '';
+                this.poolSkillValue.value = 0;
+                this.characterStats.poolConfig.skillName = '';
+                this.characterStats.poolConfig.skillValue = 0;
+            }
+            this.saveCharacterStats();
+            this.updateCalculatedPool();
+        });
+
+        this.poolSkillSelect.addEventListener('change', () => {
+            const selectedSkill = this.poolSkillSelect.value;
+            if (selectedSkill && this.characterStats.customSkills[selectedSkill]) {
+                // Populate skill name and value from custom skill
+                this.poolSkill.value = selectedSkill.charAt(0).toUpperCase() + selectedSkill.slice(1);
+                this.poolSkillValue.value = this.characterStats.customSkills[selectedSkill];
+                this.characterStats.poolConfig.skillName = selectedSkill;
+                this.characterStats.poolConfig.skillValue = this.characterStats.customSkills[selectedSkill];
+                // Clear attribute2 when skill is selected
+                this.poolAttribute2.value = '';
+                this.characterStats.poolConfig.attribute2 = '';
+                this.saveCharacterStats();
+                this.updateCalculatedPool();
+            } else if (!selectedSkill) {
+                // Clear skill inputs when "Select Custom Skill" is chosen
+                this.poolSkill.value = '';
+                this.poolSkillValue.value = 0;
+                this.characterStats.poolConfig.skillName = '';
+                this.characterStats.poolConfig.skillValue = 0;
+                this.saveCharacterStats();
+                this.updateCalculatedPool();
+            }
+        });
+
+        this.poolSkill.addEventListener('input', () => {
+            this.characterStats.poolConfig.skillName = this.poolSkill.value;
+            if (this.poolSkill.value.trim()) {
+                // Clear attribute2 and skill select when skill is manually entered
+                this.poolAttribute2.value = '';
+                this.poolSkillSelect.value = '';
+                this.characterStats.poolConfig.attribute2 = '';
+            }
+            this.saveCharacterStats();
+            this.updateCalculatedPool();
+        });
+
+        this.poolSkillValue.addEventListener('input', () => {
+            this.characterStats.poolConfig.skillValue = parseInt(this.poolSkillValue.value) || 0;
+            this.saveCharacterStats();
+            this.updateCalculatedPool();
+        });
+
+        this.poolModifier.addEventListener('input', () => {
+            this.characterStats.poolConfig.modifier = parseInt(this.poolModifier.value) || 0;
+            this.saveCharacterStats();
+            this.updateCalculatedPool();
+        });
+
+        this.useCalculatedPool.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                this.updateCalculatedPool();
+            }
+        });
+
+        // Custom skills
+        this.addSkillBtn.addEventListener('click', () => this.addCustomSkill());
+
+        // File operations
+        this.exportCharacterBtn.addEventListener('click', () => this.exportCharacterToFile());
+        this.importCharacterBtn.addEventListener('click', () => this.importCharacterFile.click());
+        this.importCharacterFile.addEventListener('change', (e) => this.importCharacterFromFile(e));
+    }
+
+    exportCharacterToFile() {
+        try {
+            const characterData = {
+                attributes: this.characterStats.attributes,
+                customSkills: this.characterStats.customSkills,
+                poolConfig: this.characterStats.poolConfig,
+                exportDate: new Date().toISOString(),
+                version: '1.0'
+            };
+
+            const jsonString = JSON.stringify(characterData, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `shadowrun-character-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            alert('Character data exported successfully!');
+        } catch (error) {
+            console.error('Export error:', error);
+            alert('Error exporting character data: ' + error.message);
+        }
+    }
+
+    importCharacterFromFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                
+                // Validate imported data structure
+                if (!importedData.attributes || !importedData.customSkills || !importedData.poolConfig) {
+                    throw new Error('Invalid character file format');
+                }
+
+                // Confirm import
+                if (!confirm('This will replace your current character data. Continue?')) {
+                    event.target.value = ''; // Reset file input
+                    return;
+                }
+
+                // Import attributes
+                Object.keys(importedData.attributes).forEach(attr => {
+                    if (this.attrInputs[attr] && importedData.attributes[attr] >= 1 && importedData.attributes[attr] <= 12) {
+                        this.characterStats.attributes[attr] = importedData.attributes[attr];
+                        this.attrInputs[attr].value = importedData.attributes[attr];
+                    }
+                });
+
+                // Import custom skills
+                this.characterStats.customSkills = {};
+                Object.keys(importedData.customSkills).forEach(skillName => {
+                    const skillValue = importedData.customSkills[skillName];
+                    if (skillValue >= 0 && skillValue <= 12) {
+                        this.characterStats.customSkills[skillName.toLowerCase()] = skillValue;
+                    }
+                });
+
+                // Import pool config
+                if (importedData.poolConfig) {
+                    this.characterStats.poolConfig = {
+                        attribute1: importedData.poolConfig.attribute1 || '',
+                        attribute2: importedData.poolConfig.attribute2 || '',
+                        skillName: importedData.poolConfig.skillName || '',
+                        skillValue: importedData.poolConfig.skillValue || 0,
+                        modifier: importedData.poolConfig.modifier || 0
+                    };
+
+                    // Update UI
+                    this.poolAttribute1.value = this.characterStats.poolConfig.attribute1;
+                    this.poolAttribute2.value = this.characterStats.poolConfig.attribute2;
+                    this.poolSkill.value = this.characterStats.poolConfig.skillName;
+                    this.poolSkillValue.value = this.characterStats.poolConfig.skillValue;
+                    this.poolModifier.value = this.characterStats.poolConfig.modifier;
+                }
+
+                // Save to localStorage
+                this.saveCharacterStats();
+
+                // Update displays
+                this.updateCustomSkillsDisplay();
+                this.updateSkillDropdown();
+                this.updateCalculatedPool();
+
+                alert('Character data imported successfully!');
+            } catch (error) {
+                console.error('Import error:', error);
+                alert('Error importing character data: ' + error.message);
+            }
+        };
+
+        reader.onerror = () => {
+            alert('Error reading file');
+        };
+
+        reader.readAsText(file);
+        event.target.value = ''; // Reset file input
+    }
+
+    addCustomSkill() {
+        const skillName = prompt('Enter skill name:');
+        if (!skillName || !skillName.trim()) return;
+
+        const skillValue = prompt('Enter skill rating (0-12):');
+        const value = parseInt(skillValue) || 0;
+        if (value < 0 || value > 12) {
+            alert('Skill rating must be between 0 and 12');
+            return;
+        }
+
+        const normalizedName = skillName.trim().toLowerCase();
+        this.characterStats.customSkills[normalizedName] = value;
+        this.saveCharacterStats();
+        this.updateCustomSkillsDisplay();
+        this.updateSkillDropdown();
+        this.updateCalculatedPool();
+    }
+
+    updateSkillDropdown() {
+        // Clear existing options except the first one
+        this.poolSkillSelect.innerHTML = '<option value="">Select Custom Skill</option>';
+        
+        // Add custom skills to dropdown
+        Object.keys(this.characterStats.customSkills).forEach(skillName => {
+            const option = document.createElement('option');
+            option.value = skillName;
+            option.textContent = `${skillName.charAt(0).toUpperCase() + skillName.slice(1)} (${this.characterStats.customSkills[skillName]})`;
+            this.poolSkillSelect.appendChild(option);
+        });
+    }
+
+    updateCustomSkillsDisplay() {
+        this.customSkillsList.innerHTML = '';
+        
+        if (Object.keys(this.characterStats.customSkills).length === 0) {
+            this.customSkillsList.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.9em;">No custom skills added</p>';
+            this.updateSkillDropdown();
+            return;
+        }
+
+        Object.keys(this.characterStats.customSkills).forEach(skillName => {
+            const skillItem = document.createElement('div');
+            skillItem.className = 'custom-skill-item';
+            
+            const skillLabel = document.createElement('span');
+            skillLabel.textContent = `${skillName.charAt(0).toUpperCase() + skillName.slice(1)}: ${this.characterStats.customSkills[skillName]}`;
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '×';
+            deleteBtn.className = 'delete-skill-btn';
+            deleteBtn.addEventListener('click', () => {
+                delete this.characterStats.customSkills[skillName];
+                this.saveCharacterStats();
+                this.updateCustomSkillsDisplay();
+                this.updateSkillDropdown();
+                this.updateCalculatedPool();
+            });
+
+            skillItem.appendChild(skillLabel);
+            skillItem.appendChild(deleteBtn);
+            this.customSkillsList.appendChild(skillItem);
+        });
+
+        // Update dropdown after adding/removing skills
+        this.updateSkillDropdown();
     }
 
     rollDice() {
-        const dicePool = parseInt(this.dicePoolInput.value) || 1;
+        // Use calculated pool if enabled, otherwise use manual input
+        let dicePool;
+        if (this.useCalculatedPool.checked) {
+            dicePool = parseInt(this.calculatedPool.textContent) || 0;
+        } else {
+            dicePool = parseInt(this.dicePoolInput.value) || 1;
+        }
         const edgePoints = parseInt(this.edgePointsInput.value) || 0;
 
         if (dicePool < 1 || dicePool > 99) {

@@ -47,6 +47,117 @@
             </div>
         </div>
 
+        <div class="character-stats-panel">
+            <button class="stats-toggle" id="statsToggle" aria-expanded="false">
+                <span>👤</span> Character Stats
+            </button>
+            <div class="stats-content" id="statsContent" aria-expanded="false">
+                <div class="stats-section">
+                    <h3>Attributes</h3>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <label for="attrBody">Body:</label>
+                            <input type="number" id="attrBody" min="1" max="12" value="3" class="stat-input">
+                        </div>
+                        <div class="stat-item">
+                            <label for="attrAgility">Agility:</label>
+                            <input type="number" id="attrAgility" min="1" max="12" value="3" class="stat-input">
+                        </div>
+                        <div class="stat-item">
+                            <label for="attrReaction">Reaction:</label>
+                            <input type="number" id="attrReaction" min="1" max="12" value="3" class="stat-input">
+                        </div>
+                        <div class="stat-item">
+                            <label for="attrStrength">Strength:</label>
+                            <input type="number" id="attrStrength" min="1" max="12" value="3" class="stat-input">
+                        </div>
+                        <div class="stat-item">
+                            <label for="attrWillpower">Willpower:</label>
+                            <input type="number" id="attrWillpower" min="1" max="12" value="3" class="stat-input">
+                        </div>
+                        <div class="stat-item">
+                            <label for="attrLogic">Logic:</label>
+                            <input type="number" id="attrLogic" min="1" max="12" value="3" class="stat-input">
+                        </div>
+                        <div class="stat-item">
+                            <label for="attrIntuition">Intuition:</label>
+                            <input type="number" id="attrIntuition" min="1" max="12" value="3" class="stat-input">
+                        </div>
+                        <div class="stat-item">
+                            <label for="attrCharisma">Charisma:</label>
+                            <input type="number" id="attrCharisma" min="1" max="12" value="3" class="stat-input">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stats-section">
+                    <h3>Dice Pool Calculation</h3>
+                    <div class="dice-pool-config">
+                        <div class="pool-config-row">
+                            <label for="poolAttribute1">Attribute 1:</label>
+                            <select id="poolAttribute1" class="attribute-select">
+                                <option value="">None</option>
+                                <option value="body">Body</option>
+                                <option value="agility">Agility</option>
+                                <option value="reaction">Reaction</option>
+                                <option value="strength">Strength</option>
+                                <option value="willpower">Willpower</option>
+                                <option value="logic">Logic</option>
+                                <option value="intuition">Intuition</option>
+                                <option value="charisma">Charisma</option>
+                            </select>
+                        </div>
+                        <div class="pool-config-row">
+                            <label for="poolAttribute2">Attribute 2 / Skill:</label>
+                            <select id="poolAttribute2" class="attribute-select">
+                                <option value="">None</option>
+                                <option value="body">Body</option>
+                                <option value="agility">Agility</option>
+                                <option value="reaction">Reaction</option>
+                                <option value="strength">Strength</option>
+                                <option value="willpower">Willpower</option>
+                                <option value="logic">Logic</option>
+                                <option value="intuition">Intuition</option>
+                                <option value="charisma">Charisma</option>
+                            </select>
+                            <select id="poolSkillSelect" class="skill-select">
+                                <option value="">Select Custom Skill</option>
+                            </select>
+                            <input type="text" id="poolSkill" placeholder="Or enter skill name" class="skill-input">
+                            <input type="number" id="poolSkillValue" min="0" max="12" value="0" placeholder="Skill Rating" class="skill-value-input">
+                        </div>
+                        <div class="pool-config-row">
+                            <label for="poolModifier">Modifier:</label>
+                            <input type="number" id="poolModifier" min="-20" max="20" value="0" class="modifier-input">
+                        </div>
+                        <div class="calculated-pool-display">
+                            <label>Calculated Dice Pool:</label>
+                            <div class="pool-value" id="calculatedPool">0</div>
+                            <label class="use-calculated-label">
+                                <input type="checkbox" id="useCalculatedPool" checked>
+                                Use Calculated Pool
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stats-section">
+                    <h3>Custom Skills</h3>
+                    <div id="customSkillsList" class="custom-skills-list"></div>
+                    <button id="addSkillBtn" class="btn-secondary">+ Add Skill</button>
+                </div>
+
+                <div class="stats-section">
+                    <h3>Save & Load Character</h3>
+                    <div class="file-actions">
+                        <button id="exportCharacterBtn" class="btn-secondary">💾 Export Character to File</button>
+                        <button id="importCharacterBtn" class="btn-secondary">📂 Import Character from File</button>
+                        <input type="file" id="importCharacterFile" accept=".json" style="display: none;">
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <main class="roll-interface">
             <div class="input-section">
                 <div class="input-group">
