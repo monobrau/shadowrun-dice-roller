@@ -62,9 +62,13 @@ class ShadowrunDiceRoller {
         this.historyList = document.getElementById('historyList');
 
         // Edge action buttons
-        this.edgeRerollFailuresBtn = document.getElementById('edgeRerollFailures');
-        this.edgeAddDiceBtn = document.getElementById('edgeAddDice');
-        this.edgePushLimitBtn = document.getElementById('edgePushLimit');
+        this.edgeRerollOneDieBtn = document.getElementById('edgeRerollOneDie');
+        this.edgeAddOneToDieBtn = document.getElementById('edgeAddOneToDie');
+        this.edgeBuySuccessBtn = document.getElementById('edgeBuySuccess');
+        this.dieSelectionArea = document.getElementById('dieSelectionArea');
+        this.selectableDice = document.getElementById('selectableDice');
+        this.cancelDieSelectionBtn = document.getElementById('cancelDieSelection');
+        this.pendingEdgeAction = null; // Track which edge action is pending die selection
 
         // Character stats
         this.statsToggle = document.getElementById('statsToggle');
@@ -237,9 +241,10 @@ class ShadowrunDiceRoller {
         this.rollButton.addEventListener('click', () => this.rollDice());
 
         // Edge action buttons
-        this.edgeRerollFailuresBtn.addEventListener('click', () => this.useEdgeRerollFailures());
-        this.edgeAddDiceBtn.addEventListener('click', () => this.useEdgeAddDice());
-        this.edgePushLimitBtn.addEventListener('click', () => this.useEdgePushLimit());
+        this.edgeRerollOneDieBtn.addEventListener('click', () => this.initiateEdgeRerollOneDie());
+        this.edgeAddOneToDieBtn.addEventListener('click', () => this.initiateEdgeAddOneToDie());
+        this.edgeBuySuccessBtn.addEventListener('click', () => this.useEdgeBuySuccess());
+        this.cancelDieSelectionBtn.addEventListener('click', () => this.cancelDieSelection());
 
         // Enter key support
         this.dicePoolInput.addEventListener('keypress', (e) => {
@@ -630,7 +635,11 @@ class ShadowrunDiceRoller {
         this.diceDisplay.innerHTML = '';
         roll.dice.forEach((die, index) => {
             const dieElement = document.createElement('div');
-            dieElement.className = `die roll-animation dice-${die.value === 1 ? '1' : die.value >= 5 ? die.value : '2-4'} ${die.exploded ? 'exploded' : ''}`;
+            let dieClass = `die roll-animation dice-${die.value === 1 ? '1' : die.value >= 5 ? die.value : '2-4'}`;
+            if (die.exploded) dieClass += ' exploded';
+            if (die.rerolled) dieClass += ' rerolled';
+            if (die.boosted) dieClass += ' boosted';
+            dieElement.className = dieClass;
             dieElement.textContent = die.value;
             dieElement.style.animationDelay = `${index * 0.05}s`;
             this.diceDisplay.appendChild(dieElement);
@@ -656,7 +665,11 @@ class ShadowrunDiceRoller {
         if (explodedDice.length > 0) {
             summary += ` (${explodedDice.length} exploded)`;
         }
-        summary += `. ${roll.hits} hits total.`;
+        summary += `. ${roll.hits} hits total`;
+        if (roll.boughtSuccess) {
+            summary += ` (1 bought with Edge)`;
+        }
+        summary += `.`;
         if (roll.ones > 0) {
             summary += ` ${roll.ones} one(s) rolled.`;
         }
@@ -672,85 +685,142 @@ class ShadowrunDiceRoller {
         if (edgePoints > 0 && this.currentRoll) {
             this.edgeActions.style.display = 'block';
             
-            // Update button states based on available edge
-            this.edgeRerollFailuresBtn.disabled = edgePoints < 1;
-            this.edgeAddDiceBtn.disabled = edgePoints < 1;
-            this.edgePushLimitBtn.disabled = edgePoints < 2;
+            // Update button states based on available edge (SR6E rules)
+            this.edgeRerollOneDieBtn.disabled = edgePoints < 1;
+            this.edgeAddOneToDieBtn.disabled = edgePoints < 2;
+            this.edgeBuySuccessBtn.disabled = edgePoints < 3;
         } else {
             this.edgeActions.style.display = 'none';
+            this.dieSelectionArea.style.display = 'none';
+            this.pendingEdgeAction = null;
         }
     }
 
-    useEdgeRerollFailures() {
-        if (!this.currentRoll || this.edgePointsInput.value < 1) return;
+    cancelDieSelection() {
+        this.dieSelectionArea.style.display = 'none';
+        this.pendingEdgeAction = null;
+        this.selectableDice.innerHTML = '';
+    }
 
+    initiateEdgeRerollOneDie() {
+        if (!this.currentRoll || this.edgePointsInput.value < 1) return;
+        
         const currentEdge = parseInt(this.edgePointsInput.value);
         if (currentEdge < 1) {
-            alert('Not enough Edge points!');
+            alert('Not enough Edge points! Need 1 Edge.');
             return;
         }
 
-        // Reroll failures (1-4)
-        const failures = this.currentRoll.dice.filter(d => d.original && d.value < 5);
-        if (failures.length === 0) {
-            alert('No failures to reroll!');
+        // Show die selection
+        this.pendingEdgeAction = { type: 'reroll', cost: 1 };
+        this.showDieSelection();
+    }
+
+    initiateEdgeAddOneToDie() {
+        if (!this.currentRoll || this.edgePointsInput.value < 2) return;
+        
+        const currentEdge = parseInt(this.edgePointsInput.value);
+        if (currentEdge < 2) {
+            alert('Not enough Edge points! Need 2 Edge.');
             return;
         }
 
-        const rerolledDice = [];
-        failures.forEach(() => {
-            const newValue = this.rollDie();
-            rerolledDice.push({
-                value: newValue,
-                exploded: false,
-                original: true,
-                rerolled: true
-            });
+        // Show die selection
+        this.pendingEdgeAction = { type: 'addOne', cost: 2 };
+        this.showDieSelection();
+    }
+
+    showDieSelection() {
+        this.selectableDice.innerHTML = '';
+        
+        // Show all dice from the current roll
+        this.currentRoll.dice.forEach((die, index) => {
+            const dieElement = document.createElement('div');
+            dieElement.className = `die selectable-die dice-${die.value === 1 ? '1' : die.value >= 5 ? die.value : '2-4'} ${die.exploded ? 'exploded' : ''}`;
+            dieElement.textContent = die.value;
+            dieElement.dataset.dieIndex = index;
+            dieElement.addEventListener('click', () => this.applyEdgeActionToDie(index));
+            this.selectableDice.appendChild(dieElement);
         });
 
-        // Update current roll
-        const originalDice = this.currentRoll.dice.filter(d => d.original && d.value >= 5);
-        const explodedDice = this.currentRoll.dice.filter(d => !d.original);
-        this.currentRoll.dice = [...originalDice, ...rerolledDice, ...explodedDice];
+        this.dieSelectionArea.style.display = 'block';
+    }
+
+    applyEdgeActionToDie(dieIndex) {
+        if (!this.pendingEdgeAction || !this.currentRoll) return;
+
+        const die = this.currentRoll.dice[dieIndex];
+        const currentEdge = parseInt(this.edgePointsInput.value);
+
+        if (currentEdge < this.pendingEdgeAction.cost) {
+            alert(`Not enough Edge points! Need ${this.pendingEdgeAction.cost} Edge.`);
+            this.cancelDieSelection();
+            return;
+        }
+
+        if (this.pendingEdgeAction.type === 'reroll') {
+            // Reroll the selected die
+            const newValue = this.rollDie();
+            die.value = newValue;
+            die.rerolled = true;
+            
+            // If it's a 6 and Rule of Six is enabled, add exploding dice
+            if (newValue === 6 && this.settings.ruleOfSix) {
+                let explodedCount = 1;
+                while (explodedCount > 0) {
+                    const explodedValue = this.rollDie();
+                    this.currentRoll.dice.push({
+                        value: explodedValue,
+                        exploded: true,
+                        original: false
+                    });
+                    if (explodedValue === 6) {
+                        explodedCount++;
+                    }
+                    explodedCount--;
+                }
+            }
+
+            this.currentRoll.edgePoints = currentEdge - 1;
+        } else if (this.pendingEdgeAction.type === 'addOne') {
+            // Add +1 to the selected die (max 6)
+            if (die.value < 6) {
+                die.value = Math.min(6, die.value + 1);
+                die.boosted = true;
+            } else {
+                alert('Die is already at maximum value (6).');
+                this.cancelDieSelection();
+                return;
+            }
+
+            this.currentRoll.edgePoints = currentEdge - 2;
+        }
 
         // Recalculate hits
         this.currentRoll.hits = this.currentRoll.dice.filter(d => d.value >= 5).length;
-        this.currentRoll.edgePoints = currentEdge - 1;
 
         // Update edge input
         this.edgePointsInput.value = this.currentRoll.edgePoints;
 
-        // Redisplay results
+        // Hide selection and redisplay results
+        this.cancelDieSelection();
         this.displayResults(this.currentRoll);
         this.updateEdgeActions(this.currentRoll.edgePoints);
     }
 
-    useEdgeAddDice() {
-        if (!this.currentRoll || this.edgePointsInput.value < 1) return;
+    useEdgeBuySuccess() {
+        if (!this.currentRoll || this.edgePointsInput.value < 3) return;
 
         const currentEdge = parseInt(this.edgePointsInput.value);
-        if (currentEdge < 1) {
-            alert('Not enough Edge points!');
+        if (currentEdge < 3) {
+            alert('Not enough Edge points! Need 3 Edge for an automatic success.');
             return;
         }
 
-        const diceToAdd = Math.min(currentEdge, 5); // Max 5 dice at once
-        const newDice = [];
-        for (let i = 0; i < diceToAdd; i++) {
-            const value = this.rollDie();
-            newDice.push({
-                value: value,
-                exploded: false,
-                original: true,
-                added: true
-            });
-        }
-
-        // Add to current roll
-        this.currentRoll.dice = [...this.currentRoll.dice, ...newDice];
-        this.currentRoll.dicePool += diceToAdd;
-        this.currentRoll.hits = this.currentRoll.dice.filter(d => d.value >= 5).length;
-        this.currentRoll.edgePoints = currentEdge - diceToAdd;
+        // Buy one automatic success (SR6E: 3 Edge)
+        this.currentRoll.hits += 1;
+        this.currentRoll.edgePoints = currentEdge - 3;
+        this.currentRoll.boughtSuccess = true;
 
         // Update edge input
         this.edgePointsInput.value = this.currentRoll.edgePoints;
@@ -760,59 +830,6 @@ class ShadowrunDiceRoller {
         this.updateEdgeActions(this.currentRoll.edgePoints);
     }
 
-    useEdgePushLimit() {
-        if (!this.currentRoll || this.edgePointsInput.value < 2) return;
-
-        const currentEdge = parseInt(this.edgePointsInput.value);
-        if (currentEdge < 2) {
-            alert('Not enough Edge points! Need 2 for Push the Limit.');
-            return;
-        }
-
-        // Push the Limit: Reroll all non-hits
-        const nonHits = this.currentRoll.dice.filter(d => d.original && d.value < 5);
-        const hits = this.currentRoll.dice.filter(d => d.original && d.value >= 5);
-        const explodedDice = this.currentRoll.dice.filter(d => !d.original);
-
-        const rerolledDice = [];
-        nonHits.forEach(() => {
-            const newValue = this.rollDie();
-            rerolledDice.push({
-                value: newValue,
-                exploded: false,
-                original: true,
-                pushed: true
-            });
-        });
-
-        // Apply Rule of Six to new dice if enabled
-        if (this.settings.ruleOfSix) {
-            let newSixes = rerolledDice.filter(d => d.value === 6).length;
-            while (newSixes > 0) {
-                const newValue = this.rollDie();
-                rerolledDice.push({
-                    value: newValue,
-                    exploded: true,
-                    original: false
-                });
-                if (newValue === 6) {
-                    newSixes++;
-                }
-                newSixes--;
-            }
-        }
-
-        this.currentRoll.dice = [...hits, ...rerolledDice, ...explodedDice];
-        this.currentRoll.hits = this.currentRoll.dice.filter(d => d.value >= 5).length;
-        this.currentRoll.edgePoints = currentEdge - 2;
-
-        // Update edge input
-        this.edgePointsInput.value = this.currentRoll.edgePoints;
-
-        // Redisplay results
-        this.displayResults(this.currentRoll);
-        this.updateEdgeActions(this.currentRoll.edgePoints);
-    }
 
     addToHistory(roll) {
         this.rollHistory.unshift(roll);

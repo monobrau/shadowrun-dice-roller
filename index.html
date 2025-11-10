@@ -184,9 +184,14 @@
                 <div class="edge-actions" id="edgeActions" style="display: none;">
                     <h3>Edge Actions</h3>
                     <div class="edge-buttons">
-                        <button id="edgeRerollFailures" class="btn-edge">Reroll Failures (1 Edge)</button>
-                        <button id="edgeAddDice" class="btn-edge">Add Dice (1 Edge per die)</button>
-                        <button id="edgePushLimit" class="btn-edge">Push the Limit (2 Edge)</button>
+                        <button id="edgeRerollOneDie" class="btn-edge">Reroll One Die (1 Edge)</button>
+                        <button id="edgeAddOneToDie" class="btn-edge">Add +1 to One Die (2 Edge)</button>
+                        <button id="edgeBuySuccess" class="btn-edge">Buy Automatic Success (3 Edge)</button>
+                    </div>
+                    <div id="dieSelectionArea" class="die-selection-area" style="display: none;">
+                        <p>Select a die to modify:</p>
+                        <div id="selectableDice" class="selectable-dice"></div>
+                        <button id="cancelDieSelection" class="btn-secondary">Cancel</button>
                     </div>
                 </div>
 
