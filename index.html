@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shadowrun 6E Dice Roller</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Shadowrun 6th Edition Dice Roller</h1>
+        </header>
+
+        <div class="settings-panel">
+            <button class="settings-toggle" id="settingsToggle" aria-expanded="false">
+                <span>⚙️</span> Settings
+            </button>
+            <div class="settings-content" id="settingsContent">
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="ruleOfSix" checked>
+                        Enable Rule of Six (Exploding Dice)
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="glitchDetection" checked>
+                        Enable Glitch Detection
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="enableSounds">
+                        Enable Dice Roll Sounds
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        Default Edge Points:
+                        <input type="number" id="defaultEdge" min="0" max="7" value="0">
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <button id="clearHistory" class="btn-secondary">Clear Roll History</button>
+                </div>
+            </div>
+        </div>
+
+        <main class="roll-interface">
+            <div class="input-section">
+                <div class="input-group">
+                    <label for="dicePool">Dice Pool Size:</label>
+                    <input type="number" id="dicePool" min="1" max="99" value="6" aria-label="Dice pool size">
+                </div>
+                <div class="input-group">
+                    <label for="edgePoints">Edge Points:</label>
+                    <input type="number" id="edgePoints" min="0" max="7" value="0" aria-label="Edge points">
+                </div>
+                <button id="rollButton" class="btn-primary">Roll Dice</button>
+            </div>
+
+            <div class="results-section" id="resultsSection" style="display: none;">
+                <div class="results-header">
+                    <h2>Roll Results</h2>
+                    <div class="hit-count" id="hitCount">0 Hits</div>
+                </div>
+                
+                <div class="glitch-warning" id="glitchWarning" style="display: none;"></div>
+                
+                <div class="dice-display" id="diceDisplay"></div>
+                
+                <div class="edge-actions" id="edgeActions" style="display: none;">
+                    <h3>Edge Actions</h3>
+                    <div class="edge-buttons">
+                        <button id="edgeRerollFailures" class="btn-edge">Reroll Failures (1 Edge)</button>
+                        <button id="edgeAddDice" class="btn-edge">Add Dice (1 Edge per die)</button>
+                        <button id="edgePushLimit" class="btn-edge">Push the Limit (2 Edge)</button>
+                    </div>
+                </div>
+
+                <div class="roll-summary" id="rollSummary"></div>
+            </div>
+        </main>
+
+        <section class="roll-history">
+            <h2>Roll History</h2>
+            <div id="historyList" class="history-list"></div>
+        </section>
+    </div>
+
+    <script src="dice-roller.js"></script>
+</body>
+</html>
+
+
