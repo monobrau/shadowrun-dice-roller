@@ -171,6 +171,14 @@
         </div>
 
         <main class="roll-interface">
+            <div class="threshold-section">
+                <label>
+                    <input type="checkbox" id="enableThreshold">
+                    Set Threshold
+                </label>
+                <input type="number" id="thresholdValue" min="1" max="20" value="1" disabled>
+            </div>
+
             <div class="input-section">
                 <div class="input-group">
                     <label for="dicePool">Dice Pool Size:</label>
@@ -242,9 +250,70 @@
             </div>
         </section>
 
+        <section class="initiative-tracker-section">
+            <button class="initiative-toggle" id="initiativeToggle" aria-expanded="false">
+                <span>⚡</span> Initiative Tracker
+            </button>
+            <div class="initiative-content" id="initiativeContent">
+                <div class="initiative-add">
+                    <h3>Add Combatant</h3>
+                    <div class="initiative-inputs">
+                        <input type="text" id="combatantName" placeholder="Name" class="initiative-name-input">
+                        <input type="number" id="combatantReaction" min="1" max="12" value="3" placeholder="Reaction" class="initiative-stat-input">
+                        <input type="number" id="combatantIntuition" min="1" max="12" value="3" placeholder="Intuition" class="initiative-stat-input">
+                        <button id="rollInitiative" class="btn-secondary">Roll Initiative</button>
+                    </div>
+                </div>
+                <div class="initiative-list-container">
+                    <div class="initiative-list-header">
+                        <h3>Turn Order</h3>
+                        <button id="clearInitiative" class="btn-secondary" style="padding: 5px 10px; font-size: 0.9em;">Clear All</button>
+                    </div>
+                    <div id="initiativeList" class="initiative-list"></div>
+                </div>
+            </div>
+        </section>
+
         <section class="roll-history">
             <h2>Roll History</h2>
             <div id="historyList" class="history-list"></div>
+        </section>
+
+        <section class="statistics-section">
+            <button class="statistics-toggle" id="statisticsToggle" aria-expanded="false">
+                <span>📊</span> Statistics
+            </button>
+            <div class="statistics-content" id="statisticsContent">
+                <div class="stats-grid-container">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Rolls</div>
+                        <div class="stat-value" id="statTotalRolls">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Average Hits</div>
+                        <div class="stat-value" id="statAvgHits">0.0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Success Rate</div>
+                        <div class="stat-value" id="statSuccessRate">0%</div>
+                        <div class="stat-subtext">(1+ hits)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Glitch Rate</div>
+                        <div class="stat-value" id="statGlitchRate">0%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Critical Glitches</div>
+                        <div class="stat-value" id="statCriticalGlitches">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Best Roll</div>
+                        <div class="stat-value" id="statBestRoll">0</div>
+                        <div class="stat-subtext">hits</div>
+                    </div>
+                </div>
+                <button id="resetStatistics" class="btn-secondary" style="width: 100%; margin-top: 15px;">Reset Statistics</button>
+            </div>
         </section>
     </div>
 

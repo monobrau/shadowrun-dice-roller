@@ -52,8 +52,10 @@ class ShadowrunDiceRoller {
         this.loadSettings();
         this.loadCharacterStats();
         this.loadPresets();
+        this.loadStatistics();
         this.attachEventListeners();
         this.updateCalculatedPool();
+        this.updateStatisticsDisplay();
     }
 
     initializeElements() {
@@ -134,6 +136,34 @@ class ShadowrunDiceRoller {
         this.opposedOutcome = document.getElementById('opposedOutcome');
         this.resetOpposedBtn = document.getElementById('resetOpposed');
         this.opposedRolls = { attacker: null, defender: null };
+
+        // Threshold tracking
+        this.enableThreshold = document.getElementById('enableThreshold');
+        this.thresholdValue = document.getElementById('thresholdValue');
+
+        // Initiative tracker
+        this.initiativeToggle = document.getElementById('initiativeToggle');
+        this.initiativeContent = document.getElementById('initiativeContent');
+        this.combatantName = document.getElementById('combatantName');
+        this.combatantReaction = document.getElementById('combatantReaction');
+        this.combatantIntuition = document.getElementById('combatantIntuition');
+        this.rollInitiativeBtn = document.getElementById('rollInitiative');
+        this.clearInitiativeBtn = document.getElementById('clearInitiative');
+        this.initiativeList = document.getElementById('initiativeList');
+        this.initiatives = [];
+
+        // Statistics
+        this.statisticsToggle = document.getElementById('statisticsToggle');
+        this.statisticsContent = document.getElementById('statisticsContent');
+        this.resetStatisticsBtn = document.getElementById('resetStatistics');
+        this.statistics = {
+            totalRolls: 0,
+            totalHits: 0,
+            successfulRolls: 0,
+            glitches: 0,
+            criticalGlitches: 0,
+            bestRoll: 0
+        };
     }
 
     loadSettings() {
@@ -213,6 +243,25 @@ class ShadowrunDiceRoller {
         } catch (error) {
             console.error('Error saving presets:', error);
             alert('Error saving preset. Your browser storage may be full.');
+        }
+    }
+
+    loadStatistics() {
+        const savedStats = localStorage.getItem('shadowrunStatistics');
+        if (savedStats) {
+            try {
+                this.statistics = { ...this.statistics, ...JSON.parse(savedStats) };
+            } catch (error) {
+                console.error('Error loading statistics:', error);
+            }
+        }
+    }
+
+    saveStatistics() {
+        try {
+            localStorage.setItem('shadowrunStatistics', JSON.stringify(this.statistics));
+        } catch (error) {
+            console.error('Error saving statistics:', error);
         }
     }
 
@@ -437,6 +486,32 @@ class ShadowrunDiceRoller {
         this.rollAttackerBtn.addEventListener('click', () => this.rollOpposedAttacker());
         this.rollDefenderBtn.addEventListener('click', () => this.rollOpposedDefender());
         this.resetOpposedBtn.addEventListener('click', () => this.resetOpposedRoll());
+
+        // Threshold toggle
+        this.enableThreshold.addEventListener('change', (e) => {
+            this.thresholdValue.disabled = !e.target.checked;
+        });
+
+        // Initiative tracker toggle
+        this.initiativeToggle.addEventListener('click', () => {
+            const isExpanded = this.initiativeContent.style.display === 'block';
+            this.initiativeContent.style.display = isExpanded ? 'none' : 'block';
+            this.initiativeToggle.setAttribute('aria-expanded', !isExpanded);
+        });
+
+        // Initiative roll button
+        this.rollInitiativeBtn.addEventListener('click', () => this.addInitiative());
+        this.clearInitiativeBtn.addEventListener('click', () => this.clearInitiatives());
+
+        // Statistics toggle
+        this.statisticsToggle.addEventListener('click', () => {
+            const isExpanded = this.statisticsContent.style.display === 'block';
+            this.statisticsContent.style.display = isExpanded ? 'none' : 'block';
+            this.statisticsToggle.setAttribute('aria-expanded', !isExpanded);
+        });
+
+        // Reset statistics
+        this.resetStatisticsBtn.addEventListener('click', () => this.resetStatistics());
     }
 
     exportCharacterToFile() {
@@ -877,7 +952,22 @@ class ShadowrunDiceRoller {
 
     displayResults(roll) {
         this.resultsSection.style.display = 'block';
-        this.hitCount.textContent = `${roll.hits} ${roll.hits === 1 ? 'Hit' : 'Hits'}`;
+
+        // Check threshold if enabled
+        let thresholdIndicator = '';
+        if (this.enableThreshold.checked) {
+            const threshold = parseInt(this.thresholdValue.value) || 1;
+            if (roll.hits >= threshold) {
+                thresholdIndicator = '<span class="threshold-indicator threshold-success">✓ Success!</span>';
+            } else {
+                thresholdIndicator = `<span class="threshold-indicator threshold-failure">✗ Failed (need ${threshold})</span>`;
+            }
+        }
+
+        this.hitCount.innerHTML = `${roll.hits} ${roll.hits === 1 ? 'Hit' : 'Hits'}${thresholdIndicator}`;
+
+        // Update statistics
+        this.updateStatistics(roll);
 
         // Display dice
         this.diceDisplay.innerHTML = '';
@@ -1231,6 +1321,163 @@ class ShadowrunDiceRoller {
         this.defenderResult.innerHTML = '';
         this.opposedOutcome.style.display = 'none';
         this.resetOpposedBtn.style.display = 'none';
+    }
+
+    updateStatistics(roll) {
+        this.statistics.totalRolls++;
+        this.statistics.totalHits += roll.hits;
+
+        if (roll.hits > 0) {
+            this.statistics.successfulRolls++;
+        }
+
+        if (roll.glitchType === 'glitch') {
+            this.statistics.glitches++;
+        }
+
+        if (roll.glitchType === 'critical-glitch') {
+            this.statistics.criticalGlitches++;
+        }
+
+        if (roll.hits > this.statistics.bestRoll) {
+            this.statistics.bestRoll = roll.hits;
+        }
+
+        this.saveStatistics();
+        this.updateStatisticsDisplay();
+    }
+
+    updateStatisticsDisplay() {
+        document.getElementById('statTotalRolls').textContent = this.statistics.totalRolls;
+
+        const avgHits = this.statistics.totalRolls > 0
+            ? (this.statistics.totalHits / this.statistics.totalRolls).toFixed(1)
+            : '0.0';
+        document.getElementById('statAvgHits').textContent = avgHits;
+
+        const successRate = this.statistics.totalRolls > 0
+            ? Math.round((this.statistics.successfulRolls / this.statistics.totalRolls) * 100)
+            : 0;
+        document.getElementById('statSuccessRate').textContent = `${successRate}%`;
+
+        const totalGlitches = this.statistics.glitches + this.statistics.criticalGlitches;
+        const glitchRate = this.statistics.totalRolls > 0
+            ? Math.round((totalGlitches / this.statistics.totalRolls) * 100)
+            : 0;
+        document.getElementById('statGlitchRate').textContent = `${glitchRate}%`;
+
+        document.getElementById('statCriticalGlitches').textContent = this.statistics.criticalGlitches;
+        document.getElementById('statBestRoll').textContent = this.statistics.bestRoll;
+    }
+
+    resetStatistics() {
+        if (!confirm('Reset all statistics? This cannot be undone.')) return;
+
+        this.statistics = {
+            totalRolls: 0,
+            totalHits: 0,
+            successfulRolls: 0,
+            glitches: 0,
+            criticalGlitches: 0,
+            bestRoll: 0
+        };
+
+        this.saveStatistics();
+        this.updateStatisticsDisplay();
+    }
+
+    addInitiative() {
+        const name = this.combatantName.value.trim();
+        if (!name) {
+            alert('Please enter a combatant name');
+            return;
+        }
+
+        const reaction = parseInt(this.combatantReaction.value) || 3;
+        const intuition = parseInt(this.combatantIntuition.value) || 3;
+
+        // Roll 1D6 for initiative
+        const initiativeRoll = this.rollDie();
+        const initiativeScore = reaction + intuition + initiativeRoll;
+
+        this.initiatives.push({
+            id: Date.now(),
+            name: name,
+            reaction: reaction,
+            intuition: intuition,
+            roll: initiativeRoll,
+            score: initiativeScore
+        });
+
+        // Sort by score (highest first)
+        this.initiatives.sort((a, b) => b.score - a.score);
+
+        // Clear input
+        this.combatantName.value = '';
+
+        this.updateInitiativeDisplay();
+
+        // Play sound if enabled
+        if (this.settings.enableSounds) {
+            this.playRollSound();
+        }
+    }
+
+    updateInitiativeDisplay() {
+        this.initiativeList.innerHTML = '';
+
+        if (this.initiatives.length === 0) {
+            this.initiativeList.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">No combatants added</p>';
+            return;
+        }
+
+        this.initiatives.forEach((combatant, index) => {
+            const item = document.createElement('div');
+            item.className = 'initiative-item';
+
+            const rank = document.createElement('div');
+            rank.className = 'initiative-rank';
+            rank.textContent = `#${index + 1}`;
+
+            const name = document.createElement('div');
+            name.className = 'initiative-name';
+            name.textContent = combatant.name;
+
+            const score = document.createElement('div');
+            score.className = 'initiative-score';
+            score.textContent = combatant.score;
+
+            const details = document.createElement('span');
+            details.className = 'initiative-roll-details';
+            details.textContent = `(${combatant.reaction}+${combatant.intuition}+${combatant.roll})`;
+            score.appendChild(details);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'initiative-delete-btn';
+            deleteBtn.textContent = '×';
+            deleteBtn.addEventListener('click', () => this.deleteInitiative(combatant.id));
+
+            item.appendChild(rank);
+            item.appendChild(name);
+            item.appendChild(score);
+            item.appendChild(deleteBtn);
+
+            this.initiativeList.appendChild(item);
+        });
+    }
+
+    deleteInitiative(id) {
+        this.initiatives = this.initiatives.filter(c => c.id !== id);
+        this.updateInitiativeDisplay();
+    }
+
+    clearInitiatives() {
+        if (this.initiatives.length === 0) return;
+
+        if (!confirm('Clear all combatants from initiative tracker?')) return;
+
+        this.initiatives = [];
+        this.updateInitiativeDisplay();
     }
 
     playRollSound() {
