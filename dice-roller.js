@@ -59,14 +59,19 @@ class ShadowrunDiceRoller {
     }
 
     initializeElements() {
-        // Settings
+        // Settings Modal
         this.settingsToggle = document.getElementById('settingsToggle');
-        this.settingsContent = document.getElementById('settingsContent');
+        this.settingsModal = document.getElementById('settingsModal');
+        this.closeSettings = document.getElementById('closeSettings');
         this.ruleOfSixCheckbox = document.getElementById('ruleOfSix');
         this.glitchDetectionCheckbox = document.getElementById('glitchDetection');
         this.enableSoundsCheckbox = document.getElementById('enableSounds');
         this.defaultEdgeInput = document.getElementById('defaultEdge');
         this.clearHistoryBtn = document.getElementById('clearHistory');
+
+        // Tabs
+        this.tabBtns = document.querySelectorAll('.tab-btn');
+        this.tabContents = document.querySelectorAll('.tab-content');
 
         // Inputs
         this.dicePoolInput = document.getElementById('dicePool');
@@ -119,14 +124,14 @@ class ShadowrunDiceRoller {
         this.importCharacterFile = document.getElementById('importCharacterFile');
 
         // Presets
-        this.presetsToggle = document.getElementById('presetsToggle');
-        this.presetsContent = document.getElementById('presetsContent');
+        this.quickPresetSelect = document.getElementById('quickPresetSelect');
+        this.managePresetsBtn = document.getElementById('managePresetsBtn');
+        this.presetsModal = document.getElementById('presetsModal');
+        this.closePresetsModal = document.getElementById('closePresetsModal');
         this.savePresetBtn = document.getElementById('savePresetBtn');
         this.presetsList = document.getElementById('presetsList');
 
         // Opposed rolls
-        this.opposedToggle = document.getElementById('opposedToggle');
-        this.opposedContent = document.getElementById('opposedContent');
         this.attackerPool = document.getElementById('attackerPool');
         this.defenderPool = document.getElementById('defenderPool');
         this.rollAttackerBtn = document.getElementById('rollAttacker');
@@ -142,8 +147,6 @@ class ShadowrunDiceRoller {
         this.thresholdValue = document.getElementById('thresholdValue');
 
         // Initiative tracker
-        this.initiativeToggle = document.getElementById('initiativeToggle');
-        this.initiativeContent = document.getElementById('initiativeContent');
         this.combatantName = document.getElementById('combatantName');
         this.combatantReaction = document.getElementById('combatantReaction');
         this.combatantIntuition = document.getElementById('combatantIntuition');
@@ -153,8 +156,6 @@ class ShadowrunDiceRoller {
         this.initiatives = [];
 
         // Statistics
-        this.statisticsToggle = document.getElementById('statisticsToggle');
-        this.statisticsContent = document.getElementById('statisticsContent');
         this.resetStatisticsBtn = document.getElementById('resetStatistics');
         this.statistics = {
             totalRolls: 0,
@@ -310,11 +311,28 @@ class ShadowrunDiceRoller {
     }
 
     attachEventListeners() {
-        // Settings toggle
+        // Tab switching
+        this.tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabName = btn.dataset.tab;
+                this.switchTab(tabName);
+            });
+        });
+
+        // Settings modal
         this.settingsToggle.addEventListener('click', () => {
-            const isExpanded = this.settingsContent.style.display === 'block';
-            this.settingsContent.style.display = isExpanded ? 'none' : 'block';
-            this.settingsToggle.setAttribute('aria-expanded', !isExpanded);
+            this.settingsModal.style.display = 'flex';
+        });
+
+        this.closeSettings.addEventListener('click', () => {
+            this.settingsModal.style.display = 'none';
+        });
+
+        // Close modal when clicking outside
+        this.settingsModal.addEventListener('click', (e) => {
+            if (e.target === this.settingsModal) {
+                this.settingsModal.style.display = 'none';
+            }
         });
 
         // Settings changes
@@ -465,21 +483,29 @@ class ShadowrunDiceRoller {
         this.importCharacterBtn.addEventListener('click', () => this.importCharacterFile.click());
         this.importCharacterFile.addEventListener('change', (e) => this.importCharacterFromFile(e));
 
-        // Presets toggle
-        this.presetsToggle.addEventListener('click', () => {
-            const isExpanded = this.presetsContent.style.display === 'block';
-            this.presetsContent.style.display = isExpanded ? 'none' : 'block';
-            this.presetsToggle.setAttribute('aria-expanded', !isExpanded);
+        // Presets modal
+        this.managePresetsBtn.addEventListener('click', () => {
+            this.presetsModal.style.display = 'flex';
+        });
+
+        this.closePresetsModal.addEventListener('click', () => {
+            this.presetsModal.style.display = 'none';
+        });
+
+        this.presetsModal.addEventListener('click', (e) => {
+            if (e.target === this.presetsModal) {
+                this.presetsModal.style.display = 'none';
+            }
         });
 
         // Save preset
         this.savePresetBtn.addEventListener('click', () => this.saveCurrentAsPreset());
 
-        // Opposed rolls toggle
-        this.opposedToggle.addEventListener('click', () => {
-            const isExpanded = this.opposedContent.style.display === 'block';
-            this.opposedContent.style.display = isExpanded ? 'none' : 'block';
-            this.opposedToggle.setAttribute('aria-expanded', !isExpanded);
+        // Quick preset selector
+        this.quickPresetSelect.addEventListener('change', (e) => {
+            if (e.target.value) {
+                this.loadPreset(e.target.value);
+            }
         });
 
         // Opposed roll buttons
@@ -492,26 +518,32 @@ class ShadowrunDiceRoller {
             this.thresholdValue.disabled = !e.target.checked;
         });
 
-        // Initiative tracker toggle
-        this.initiativeToggle.addEventListener('click', () => {
-            const isExpanded = this.initiativeContent.style.display === 'block';
-            this.initiativeContent.style.display = isExpanded ? 'none' : 'block';
-            this.initiativeToggle.setAttribute('aria-expanded', !isExpanded);
-        });
-
         // Initiative roll button
         this.rollInitiativeBtn.addEventListener('click', () => this.addInitiative());
         this.clearInitiativeBtn.addEventListener('click', () => this.clearInitiatives());
 
-        // Statistics toggle
-        this.statisticsToggle.addEventListener('click', () => {
-            const isExpanded = this.statisticsContent.style.display === 'block';
-            this.statisticsContent.style.display = isExpanded ? 'none' : 'block';
-            this.statisticsToggle.setAttribute('aria-expanded', !isExpanded);
-        });
-
         // Reset statistics
         this.resetStatisticsBtn.addEventListener('click', () => this.resetStatistics());
+    }
+
+    switchTab(tabName) {
+        // Update tab buttons
+        this.tabBtns.forEach(btn => {
+            if (btn.dataset.tab === tabName) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
+        // Update tab content
+        this.tabContents.forEach(content => {
+            if (content.id === `tab-${tabName}`) {
+                content.classList.add('active');
+            } else {
+                content.classList.remove('active');
+            }
+        });
     }
 
     exportCharacterToFile() {
@@ -793,62 +825,78 @@ class ShadowrunDiceRoller {
     }
 
     updatePresetsDisplay() {
+        // Update modal list
         this.presetsList.innerHTML = '';
 
         const presetIds = Object.keys(this.rollPresets);
         if (presetIds.length === 0) {
             this.presetsList.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.9em;">No presets saved</p>';
-            return;
         }
+
+        // Update quick dropdown
+        this.quickPresetSelect.innerHTML = '<option value="">-- Select Preset --</option>';
 
         presetIds.forEach(presetId => {
             const preset = this.rollPresets[presetId];
-            const presetItem = document.createElement('div');
-            presetItem.className = 'preset-item';
 
-            const presetInfo = document.createElement('div');
-            presetInfo.className = 'preset-info';
-            presetInfo.addEventListener('click', () => this.loadPreset(presetId));
+            // Add to quick dropdown
+            const option = document.createElement('option');
+            option.value = presetId;
+            option.textContent = preset.name;
+            this.quickPresetSelect.appendChild(option);
 
-            const presetName = document.createElement('div');
-            presetName.className = 'preset-name';
-            presetName.textContent = preset.name;
+            // Add to modal list if not empty
+            if (presetIds.length > 0) {
+                const presetItem = document.createElement('div');
+                presetItem.className = 'preset-item';
 
-            const presetDetails = document.createElement('div');
-            presetDetails.className = 'preset-details';
-            let detailsText = `Pool: ${preset.dicePool}`;
-            if (preset.poolConfig && preset.poolConfig.attribute1) {
-                detailsText += ` | ${preset.poolConfig.attribute1}`;
-                if (preset.poolConfig.attribute2) {
-                    detailsText += ` + ${preset.poolConfig.attribute2}`;
-                } else if (preset.poolConfig.skillName) {
-                    detailsText += ` + ${preset.poolConfig.skillName}`;
+                const presetInfo = document.createElement('div');
+                presetInfo.className = 'preset-info';
+                presetInfo.addEventListener('click', () => {
+                    this.loadPreset(presetId);
+                    this.presetsModal.style.display = 'none';
+                });
+
+                const presetName = document.createElement('div');
+                presetName.className = 'preset-name';
+                presetName.textContent = preset.name;
+
+                const presetDetails = document.createElement('div');
+                presetDetails.className = 'preset-details';
+                let detailsText = `Pool: ${preset.dicePool}`;
+                if (preset.poolConfig && preset.poolConfig.attribute1) {
+                    detailsText += ` | ${preset.poolConfig.attribute1}`;
+                    if (preset.poolConfig.attribute2) {
+                        detailsText += ` + ${preset.poolConfig.attribute2}`;
+                    } else if (preset.poolConfig.skillName) {
+                        detailsText += ` + ${preset.poolConfig.skillName}`;
+                    }
+                    if (preset.poolConfig.modifier !== 0) {
+                        detailsText += ` ${preset.poolConfig.modifier >= 0 ? '+' : ''}${preset.poolConfig.modifier}`;
+                    }
                 }
-                if (preset.poolConfig.modifier !== 0) {
-                    detailsText += ` ${preset.poolConfig.modifier >= 0 ? '+' : ''}${preset.poolConfig.modifier}`;
-                }
+                presetDetails.textContent = detailsText;
+
+                presetInfo.appendChild(presetName);
+                presetInfo.appendChild(presetDetails);
+
+                const presetActions = document.createElement('div');
+                presetActions.className = 'preset-actions';
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '×';
+                deleteBtn.className = 'preset-delete-btn';
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.deletePreset(presetId);
+                });
+
+                presetActions.appendChild(deleteBtn);
+
+                presetItem.appendChild(presetInfo);
+                presetItem.appendChild(presetActions);
+                this.presetsList.appendChild(presetItem);
             }
-            presetDetails.textContent = detailsText;
-
-            presetInfo.appendChild(presetName);
-            presetInfo.appendChild(presetDetails);
-
-            const presetActions = document.createElement('div');
-            presetActions.className = 'preset-actions';
-
-            const deleteBtn = document.createElement('button');
-            deleteBtn.textContent = '×';
-            deleteBtn.className = 'preset-delete-btn';
-            deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.deletePreset(presetId);
-            });
-
-            presetActions.appendChild(deleteBtn);
-
-            presetItem.appendChild(presetInfo);
-            presetItem.appendChild(presetActions);
-            this.presetsList.appendChild(presetItem);
         });
     }
 

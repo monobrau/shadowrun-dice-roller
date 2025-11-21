@@ -10,39 +10,43 @@
     <div class="container">
         <header>
             <h1>Shadowrun 6th Edition Dice Roller</h1>
+            <button class="settings-icon-btn" id="settingsToggle" aria-expanded="false" title="Settings">⚙️</button>
         </header>
 
-        <div class="settings-panel">
-            <button class="settings-toggle" id="settingsToggle" aria-expanded="false">
-                <span>⚙️</span> Settings
-            </button>
-            <div class="settings-content" id="settingsContent">
-                <div class="setting-item">
-                    <label>
-                        <input type="checkbox" id="ruleOfSix" checked>
-                        Enable Rule of Six (Exploding Dice)
-                    </label>
+        <div class="settings-modal" id="settingsModal" style="display: none;">
+            <div class="settings-modal-content">
+                <div class="settings-modal-header">
+                    <h2>Settings</h2>
+                    <button class="close-modal" id="closeSettings">×</button>
                 </div>
-                <div class="setting-item">
-                    <label>
-                        <input type="checkbox" id="glitchDetection" checked>
-                        Enable Glitch Detection
-                    </label>
-                </div>
-                <div class="setting-item">
-                    <label>
-                        <input type="checkbox" id="enableSounds">
-                        Enable Dice Roll Sounds
-                    </label>
-                </div>
-                <div class="setting-item">
-                    <label>
-                        Default Edge Points:
-                        <input type="number" id="defaultEdge" min="0" max="7" value="0">
-                    </label>
-                </div>
-                <div class="setting-item">
-                    <button id="clearHistory" class="btn-secondary">Clear Roll History</button>
+                <div class="settings-modal-body">
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="ruleOfSix" checked>
+                            Enable Rule of Six (Exploding Dice)
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="glitchDetection" checked>
+                            Enable Glitch Detection
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="enableSounds">
+                            Enable Dice Roll Sounds
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            Default Edge Points:
+                            <input type="number" id="defaultEdge" min="0" max="7" value="0">
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <button id="clearHistory" class="btn-secondary">Clear Roll History</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -158,25 +162,32 @@
             </div>
         </div>
 
-        <div class="presets-panel">
-            <button class="presets-toggle" id="presetsToggle" aria-expanded="false">
-                <span>📋</span> Roll Presets
-            </button>
-            <div class="presets-content" id="presetsContent">
-                <div class="presets-actions">
-                    <button id="savePresetBtn" class="btn-secondary">💾 Save Current Roll as Preset</button>
-                </div>
-                <div id="presetsList" class="presets-list"></div>
-            </div>
+        <!-- Tab Navigation -->
+        <div class="tab-navigation">
+            <button class="tab-btn active" data-tab="roll">🎲 Roll Dice</button>
+            <button class="tab-btn" data-tab="opposed">⚔️ Opposed Roll</button>
+            <button class="tab-btn" data-tab="initiative">⚡ Initiative</button>
         </div>
 
-        <main class="roll-interface">
-            <div class="threshold-section">
-                <label>
-                    <input type="checkbox" id="enableThreshold">
-                    Set Threshold
-                </label>
-                <input type="number" id="thresholdValue" min="1" max="20" value="1" disabled>
+        <!-- Tab: Roll Dice -->
+        <main class="tab-content active" id="tab-roll">
+            <!-- Presets Quick Access -->
+            <div class="presets-quick-section">
+                <label>Quick Preset:</label>
+                <select id="quickPresetSelect" class="quick-preset-select">
+                    <option value="">-- Select Preset --</option>
+                </select>
+                <button id="managePresetsBtn" class="btn-secondary btn-small">Manage</button>
+            </div>
+
+            <div class="roll-config-section">
+                <div class="threshold-controls">
+                    <label>
+                        <input type="checkbox" id="enableThreshold">
+                        Threshold:
+                    </label>
+                    <input type="number" id="thresholdValue" min="1" max="20" value="1" disabled>
+                </div>
             </div>
 
             <div class="input-section">
@@ -219,11 +230,12 @@
             </div>
         </main>
 
-        <section class="opposed-rolls-section">
-            <button class="opposed-toggle" id="opposedToggle" aria-expanded="false">
-                <span>⚔️</span> Opposed Roll
-            </button>
-            <div class="opposed-content" id="opposedContent">
+        <!-- Tab: Opposed Roll -->
+        <section class="tab-content" id="tab-opposed">
+            <div class="opposed-info-banner">
+                <strong>Opposed Roll:</strong> Roll for both attacker and defender, then compare hits to determine the outcome.
+            </div>
+            <div class="opposed-content">
                 <div class="opposed-grid">
                     <div class="opposed-player">
                         <h3>Attacker</h3>
@@ -250,11 +262,12 @@
             </div>
         </section>
 
-        <section class="initiative-tracker-section">
-            <button class="initiative-toggle" id="initiativeToggle" aria-expanded="false">
-                <span>⚡</span> Initiative Tracker
-            </button>
-            <div class="initiative-content" id="initiativeContent">
+        <!-- Tab: Initiative -->
+        <section class="tab-content" id="tab-initiative">
+            <div class="initiative-info-banner">
+                <strong>Initiative Tracker:</strong> Roll initiative (Reaction + Intuition + 1D6) for each combatant to determine turn order.
+            </div>
+            <div class="initiative-content">
                 <div class="initiative-add">
                     <h3>Add Combatant</h3>
                     <div class="initiative-inputs">
@@ -274,16 +287,15 @@
             </div>
         </section>
 
-        <section class="roll-history">
-            <h2>Roll History</h2>
-            <div id="historyList" class="history-list"></div>
-        </section>
-
-        <section class="statistics-section">
-            <button class="statistics-toggle" id="statisticsToggle" aria-expanded="false">
-                <span>📊</span> Statistics
-            </button>
-            <div class="statistics-content" id="statisticsContent">
+        <!-- Bottom Sections -->
+        <div class="bottom-sections">
+            <div class="bottom-section">
+                <h2>📜 Roll History</h2>
+                <div id="historyList" class="history-list"></div>
+            </div>
+            <div class="bottom-section">
+                <h2>📊 Statistics</h2>
+                <div class="statistics-content">
                 <div class="stats-grid-container">
                     <div class="stat-card">
                         <div class="stat-label">Total Rolls</div>
@@ -314,7 +326,22 @@
                 </div>
                 <button id="resetStatistics" class="btn-secondary" style="width: 100%; margin-top: 15px;">Reset Statistics</button>
             </div>
-        </section>
+            </div>
+        </div>
+
+        <!-- Presets Management Modal -->
+        <div class="presets-modal" id="presetsModal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Manage Presets</h2>
+                    <button class="close-modal" id="closePresetsModal">×</button>
+                </div>
+                <div class="modal-body">
+                    <button id="savePresetBtn" class="btn-primary" style="width: 100%; margin-bottom: 20px;">💾 Save Current as Preset</button>
+                    <div id="presetsList" class="presets-list"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="dice-roller.js"></script>
