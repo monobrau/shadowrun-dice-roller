@@ -1,8 +1,25 @@
 // Shadowrun 6th Edition Dice Roller
+
+// Constants
+const MAX_EDGE = 7;
+const MAX_DICE_POOL = 99;
+const MIN_DICE_POOL = 1;
+const MAX_ATTRIBUTE = 12;
+const MIN_ATTRIBUTE = 1;
+const MAX_SKILL = 12;
+const MIN_SKILL = 0;
+const MAX_MODIFIER = 20;
+const MIN_MODIFIER = -20;
+const MAX_HISTORY = 50;
+const EDGE_COST_REROLL = 1;
+const EDGE_COST_ADD_ONE = 2;
+const EDGE_COST_BUY_SUCCESS = 3;
+
 class ShadowrunDiceRoller {
     constructor() {
         this.rollHistory = [];
         this.currentRoll = null;
+        this.audioContext = null; // Initialize audio context once
         this.settings = {
             ruleOfSix: true,
             glitchDetection: true,
@@ -29,10 +46,12 @@ class ShadowrunDiceRoller {
                 modifier: 0
             }
         };
+        this.rollPresets = {};
         
         this.initializeElements();
         this.loadSettings();
         this.loadCharacterStats();
+        this.loadPresets();
         this.attachEventListeners();
         this.updateCalculatedPool();
     }
@@ -96,6 +115,25 @@ class ShadowrunDiceRoller {
         this.exportCharacterBtn = document.getElementById('exportCharacterBtn');
         this.importCharacterBtn = document.getElementById('importCharacterBtn');
         this.importCharacterFile = document.getElementById('importCharacterFile');
+
+        // Presets
+        this.presetsToggle = document.getElementById('presetsToggle');
+        this.presetsContent = document.getElementById('presetsContent');
+        this.savePresetBtn = document.getElementById('savePresetBtn');
+        this.presetsList = document.getElementById('presetsList');
+
+        // Opposed rolls
+        this.opposedToggle = document.getElementById('opposedToggle');
+        this.opposedContent = document.getElementById('opposedContent');
+        this.attackerPool = document.getElementById('attackerPool');
+        this.defenderPool = document.getElementById('defenderPool');
+        this.rollAttackerBtn = document.getElementById('rollAttacker');
+        this.rollDefenderBtn = document.getElementById('rollDefender');
+        this.attackerResult = document.getElementById('attackerResult');
+        this.defenderResult = document.getElementById('defenderResult');
+        this.opposedOutcome = document.getElementById('opposedOutcome');
+        this.resetOpposedBtn = document.getElementById('resetOpposed');
+        this.opposedRolls = { attacker: null, defender: null };
     }
 
     loadSettings() {
@@ -154,6 +192,28 @@ class ShadowrunDiceRoller {
 
     saveCharacterStats() {
         localStorage.setItem('shadowrunCharacterStats', JSON.stringify(this.characterStats));
+    }
+
+    loadPresets() {
+        const savedPresets = localStorage.getItem('shadowrunRollPresets');
+        if (savedPresets) {
+            try {
+                this.rollPresets = JSON.parse(savedPresets);
+                this.updatePresetsDisplay();
+            } catch (error) {
+                console.error('Error loading presets:', error);
+                this.rollPresets = {};
+            }
+        }
+    }
+
+    savePresets() {
+        try {
+            localStorage.setItem('shadowrunRollPresets', JSON.stringify(this.rollPresets));
+        } catch (error) {
+            console.error('Error saving presets:', error);
+            alert('Error saving preset. Your browser storage may be full.');
+        }
     }
 
     updateCalculatedPool() {
@@ -225,7 +285,8 @@ class ShadowrunDiceRoller {
         });
 
         this.defaultEdgeInput.addEventListener('change', (e) => {
-            this.settings.defaultEdge = parseInt(e.target.value) || 0;
+            const value = parseInt(e.target.value) || 0;
+            this.settings.defaultEdge = Math.max(0, Math.min(MAX_EDGE, value));
             this.saveSettings();
         });
 
@@ -354,6 +415,28 @@ class ShadowrunDiceRoller {
         this.exportCharacterBtn.addEventListener('click', () => this.exportCharacterToFile());
         this.importCharacterBtn.addEventListener('click', () => this.importCharacterFile.click());
         this.importCharacterFile.addEventListener('change', (e) => this.importCharacterFromFile(e));
+
+        // Presets toggle
+        this.presetsToggle.addEventListener('click', () => {
+            const isExpanded = this.presetsContent.style.display === 'block';
+            this.presetsContent.style.display = isExpanded ? 'none' : 'block';
+            this.presetsToggle.setAttribute('aria-expanded', !isExpanded);
+        });
+
+        // Save preset
+        this.savePresetBtn.addEventListener('click', () => this.saveCurrentAsPreset());
+
+        // Opposed rolls toggle
+        this.opposedToggle.addEventListener('click', () => {
+            const isExpanded = this.opposedContent.style.display === 'block';
+            this.opposedContent.style.display = isExpanded ? 'none' : 'block';
+            this.opposedToggle.setAttribute('aria-expanded', !isExpanded);
+        });
+
+        // Opposed roll buttons
+        this.rollAttackerBtn.addEventListener('click', () => this.rollOpposedAttacker());
+        this.rollDefenderBtn.addEventListener('click', () => this.rollOpposedDefender());
+        this.resetOpposedBtn.addEventListener('click', () => this.resetOpposedRoll());
     }
 
     exportCharacterToFile() {
@@ -393,10 +476,22 @@ class ShadowrunDiceRoller {
         reader.onload = (e) => {
             try {
                 const importedData = JSON.parse(e.target.result);
-                
-                // Validate imported data structure
-                if (!importedData.attributes || !importedData.customSkills || !importedData.poolConfig) {
-                    throw new Error('Invalid character file format');
+
+                // Validate imported data structure and types
+                if (!importedData || typeof importedData !== 'object') {
+                    throw new Error('Invalid file format: Not a valid JSON object');
+                }
+
+                if (!importedData.attributes || typeof importedData.attributes !== 'object') {
+                    throw new Error('Invalid character file format: Missing or invalid attributes');
+                }
+
+                if (!importedData.customSkills || typeof importedData.customSkills !== 'object') {
+                    throw new Error('Invalid character file format: Missing or invalid custom skills');
+                }
+
+                if (!importedData.poolConfig || typeof importedData.poolConfig !== 'object') {
+                    throw new Error('Invalid character file format: Missing or invalid pool config');
                 }
 
                 // Confirm import
@@ -405,31 +500,45 @@ class ShadowrunDiceRoller {
                     return;
                 }
 
-                // Import attributes
+                // Import attributes with validation
+                const validAttributes = ['body', 'agility', 'reaction', 'strength', 'willpower', 'logic', 'intuition', 'charisma'];
                 Object.keys(importedData.attributes).forEach(attr => {
-                    if (this.attrInputs[attr] && importedData.attributes[attr] >= 1 && importedData.attributes[attr] <= 12) {
-                        this.characterStats.attributes[attr] = importedData.attributes[attr];
-                        this.attrInputs[attr].value = importedData.attributes[attr];
+                    if (validAttributes.includes(attr) &&
+                        this.attrInputs[attr] &&
+                        typeof importedData.attributes[attr] === 'number' &&
+                        importedData.attributes[attr] >= MIN_ATTRIBUTE &&
+                        importedData.attributes[attr] <= MAX_ATTRIBUTE) {
+                        this.characterStats.attributes[attr] = Math.floor(importedData.attributes[attr]);
+                        this.attrInputs[attr].value = this.characterStats.attributes[attr];
                     }
                 });
 
-                // Import custom skills
+                // Import custom skills with validation
                 this.characterStats.customSkills = {};
                 Object.keys(importedData.customSkills).forEach(skillName => {
                     const skillValue = importedData.customSkills[skillName];
-                    if (skillValue >= 0 && skillValue <= 12) {
-                        this.characterStats.customSkills[skillName.toLowerCase()] = skillValue;
+                    if (typeof skillName === 'string' &&
+                        skillName.trim().length > 0 &&
+                        typeof skillValue === 'number' &&
+                        skillValue >= MIN_SKILL &&
+                        skillValue <= MAX_SKILL) {
+                        const sanitizedName = skillName.trim().toLowerCase().substring(0, 100); // Limit length
+                        this.characterStats.customSkills[sanitizedName] = Math.floor(skillValue);
                     }
                 });
 
-                // Import pool config
+                // Import pool config with validation
                 if (importedData.poolConfig) {
+                    const validAttrValues = ['', ...validAttributes];
+
                     this.characterStats.poolConfig = {
-                        attribute1: importedData.poolConfig.attribute1 || '',
-                        attribute2: importedData.poolConfig.attribute2 || '',
-                        skillName: importedData.poolConfig.skillName || '',
-                        skillValue: importedData.poolConfig.skillValue || 0,
-                        modifier: importedData.poolConfig.modifier || 0
+                        attribute1: validAttrValues.includes(importedData.poolConfig.attribute1) ? importedData.poolConfig.attribute1 : '',
+                        attribute2: validAttrValues.includes(importedData.poolConfig.attribute2) ? importedData.poolConfig.attribute2 : '',
+                        skillName: typeof importedData.poolConfig.skillName === 'string' ? importedData.poolConfig.skillName.substring(0, 100) : '',
+                        skillValue: typeof importedData.poolConfig.skillValue === 'number' ?
+                            Math.max(MIN_SKILL, Math.min(MAX_SKILL, Math.floor(importedData.poolConfig.skillValue))) : 0,
+                        modifier: typeof importedData.poolConfig.modifier === 'number' ?
+                            Math.max(MIN_MODIFIER, Math.min(MAX_MODIFIER, Math.floor(importedData.poolConfig.modifier))) : 0
                     };
 
                     // Update UI
@@ -440,8 +549,13 @@ class ShadowrunDiceRoller {
                     this.poolModifier.value = this.characterStats.poolConfig.modifier;
                 }
 
-                // Save to localStorage
-                this.saveCharacterStats();
+                // Save to localStorage with error handling
+                try {
+                    this.saveCharacterStats();
+                } catch (saveError) {
+                    console.error('Save error:', saveError);
+                    alert('Warning: Character data imported but could not be saved to browser storage');
+                }
 
                 // Update displays
                 this.updateCustomSkillsDisplay();
@@ -467,16 +581,22 @@ class ShadowrunDiceRoller {
         const skillName = prompt('Enter skill name:');
         if (!skillName || !skillName.trim()) return;
 
-        const skillValue = prompt('Enter skill rating (0-12):');
-        const value = parseInt(skillValue) || 0;
-        if (value < 0 || value > 12) {
-            alert('Skill rating must be between 0 and 12');
+        const skillValue = prompt(`Enter skill rating (${MIN_SKILL}-${MAX_SKILL}):`);
+        const value = parseInt(skillValue);
+        if (isNaN(value) || value < MIN_SKILL || value > MAX_SKILL) {
+            alert(`Skill rating must be between ${MIN_SKILL} and ${MAX_SKILL}`);
             return;
         }
 
-        const normalizedName = skillName.trim().toLowerCase();
+        const normalizedName = skillName.trim().toLowerCase().substring(0, 100);
         this.characterStats.customSkills[normalizedName] = value;
-        this.saveCharacterStats();
+        try {
+            this.saveCharacterStats();
+        } catch (error) {
+            console.error('Save error:', error);
+            alert('Error saving skill. Your browser storage may be full.');
+            return;
+        }
         this.updateCustomSkillsDisplay();
         this.updateSkillDropdown();
         this.updateCalculatedPool();
@@ -531,23 +651,149 @@ class ShadowrunDiceRoller {
         this.updateSkillDropdown();
     }
 
+    saveCurrentAsPreset() {
+        const presetName = prompt('Enter a name for this preset:');
+        if (!presetName || !presetName.trim()) return;
+
+        const sanitizedName = presetName.trim().substring(0, 50);
+
+        // Get current pool configuration
+        const preset = {
+            name: sanitizedName,
+            dicePool: parseInt(this.dicePoolInput.value) || MIN_DICE_POOL,
+            useCalculatedPool: this.useCalculatedPool.checked,
+            poolConfig: {
+                attribute1: this.poolAttribute1.value,
+                attribute2: this.poolAttribute2.value,
+                skillName: this.poolSkill.value,
+                skillValue: parseInt(this.poolSkillValue.value) || 0,
+                modifier: parseInt(this.poolModifier.value) || 0
+            }
+        };
+
+        const presetId = Date.now().toString();
+        this.rollPresets[presetId] = preset;
+        this.savePresets();
+        this.updatePresetsDisplay();
+    }
+
+    loadPreset(presetId) {
+        const preset = this.rollPresets[presetId];
+        if (!preset) return;
+
+        // Load dice pool settings
+        this.dicePoolInput.value = preset.dicePool;
+        this.useCalculatedPool.checked = preset.useCalculatedPool;
+
+        // Load pool configuration
+        if (preset.poolConfig) {
+            this.poolAttribute1.value = preset.poolConfig.attribute1 || '';
+            this.poolAttribute2.value = preset.poolConfig.attribute2 || '';
+            this.poolSkill.value = preset.poolConfig.skillName || '';
+            this.poolSkillValue.value = preset.poolConfig.skillValue || 0;
+            this.poolModifier.value = preset.poolConfig.modifier || 0;
+
+            // Update character stats poolConfig
+            this.characterStats.poolConfig = {
+                attribute1: preset.poolConfig.attribute1 || '',
+                attribute2: preset.poolConfig.attribute2 || '',
+                skillName: preset.poolConfig.skillName || '',
+                skillValue: preset.poolConfig.skillValue || 0,
+                modifier: preset.poolConfig.modifier || 0
+            };
+        }
+
+        this.updateCalculatedPool();
+    }
+
+    deletePreset(presetId) {
+        const preset = this.rollPresets[presetId];
+        if (!preset) return;
+
+        if (confirm(`Delete preset "${preset.name}"?`)) {
+            delete this.rollPresets[presetId];
+            this.savePresets();
+            this.updatePresetsDisplay();
+        }
+    }
+
+    updatePresetsDisplay() {
+        this.presetsList.innerHTML = '';
+
+        const presetIds = Object.keys(this.rollPresets);
+        if (presetIds.length === 0) {
+            this.presetsList.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.9em;">No presets saved</p>';
+            return;
+        }
+
+        presetIds.forEach(presetId => {
+            const preset = this.rollPresets[presetId];
+            const presetItem = document.createElement('div');
+            presetItem.className = 'preset-item';
+
+            const presetInfo = document.createElement('div');
+            presetInfo.className = 'preset-info';
+            presetInfo.addEventListener('click', () => this.loadPreset(presetId));
+
+            const presetName = document.createElement('div');
+            presetName.className = 'preset-name';
+            presetName.textContent = preset.name;
+
+            const presetDetails = document.createElement('div');
+            presetDetails.className = 'preset-details';
+            let detailsText = `Pool: ${preset.dicePool}`;
+            if (preset.poolConfig && preset.poolConfig.attribute1) {
+                detailsText += ` | ${preset.poolConfig.attribute1}`;
+                if (preset.poolConfig.attribute2) {
+                    detailsText += ` + ${preset.poolConfig.attribute2}`;
+                } else if (preset.poolConfig.skillName) {
+                    detailsText += ` + ${preset.poolConfig.skillName}`;
+                }
+                if (preset.poolConfig.modifier !== 0) {
+                    detailsText += ` ${preset.poolConfig.modifier >= 0 ? '+' : ''}${preset.poolConfig.modifier}`;
+                }
+            }
+            presetDetails.textContent = detailsText;
+
+            presetInfo.appendChild(presetName);
+            presetInfo.appendChild(presetDetails);
+
+            const presetActions = document.createElement('div');
+            presetActions.className = 'preset-actions';
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '×';
+            deleteBtn.className = 'preset-delete-btn';
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.deletePreset(presetId);
+            });
+
+            presetActions.appendChild(deleteBtn);
+
+            presetItem.appendChild(presetInfo);
+            presetItem.appendChild(presetActions);
+            this.presetsList.appendChild(presetItem);
+        });
+    }
+
     rollDice() {
         // Use calculated pool if enabled, otherwise use manual input
         let dicePool;
         if (this.useCalculatedPool.checked) {
             dicePool = parseInt(this.calculatedPool.textContent) || 0;
         } else {
-            dicePool = parseInt(this.dicePoolInput.value) || 1;
+            dicePool = parseInt(this.dicePoolInput.value) || MIN_DICE_POOL;
         }
         const edgePoints = parseInt(this.edgePointsInput.value) || 0;
 
-        if (dicePool < 1 || dicePool > 99) {
-            alert('Dice pool must be between 1 and 99');
+        if (dicePool < MIN_DICE_POOL || dicePool > MAX_DICE_POOL) {
+            alert(`Dice pool must be between ${MIN_DICE_POOL} and ${MAX_DICE_POOL}`);
             return;
         }
 
-        if (edgePoints < 0 || edgePoints > 7) {
-            alert('Edge points must be between 0 and 7');
+        if (edgePoints < 0 || edgePoints > MAX_EDGE) {
+            alert(`Edge points must be between 0 and ${MAX_EDGE}`);
             return;
         }
 
@@ -686,11 +932,11 @@ class ShadowrunDiceRoller {
     updateEdgeActions(edgePoints) {
         if (edgePoints > 0 && this.currentRoll) {
             this.edgeActions.style.display = 'block';
-            
+
             // Update button states based on available edge (SR6E rules)
-            this.edgeRerollOneDieBtn.disabled = edgePoints < 1;
-            this.edgeAddOneToDieBtn.disabled = edgePoints < 2;
-            this.edgeBuySuccessBtn.disabled = edgePoints < 3;
+            this.edgeRerollOneDieBtn.disabled = edgePoints < EDGE_COST_REROLL;
+            this.edgeAddOneToDieBtn.disabled = edgePoints < EDGE_COST_ADD_ONE;
+            this.edgeBuySuccessBtn.disabled = edgePoints < EDGE_COST_BUY_SUCCESS;
         } else {
             this.edgeActions.style.display = 'none';
             this.dieSelectionArea.style.display = 'none';
@@ -705,30 +951,30 @@ class ShadowrunDiceRoller {
     }
 
     initiateEdgeRerollOneDie() {
-        if (!this.currentRoll || this.edgePointsInput.value < 1) return;
-        
+        if (!this.currentRoll || this.edgePointsInput.value < EDGE_COST_REROLL) return;
+
         const currentEdge = parseInt(this.edgePointsInput.value);
-        if (currentEdge < 1) {
-            alert('Not enough Edge points! Need 1 Edge.');
+        if (currentEdge < EDGE_COST_REROLL) {
+            alert(`Not enough Edge points! Need ${EDGE_COST_REROLL} Edge.`);
             return;
         }
 
         // Show die selection
-        this.pendingEdgeAction = { type: 'reroll', cost: 1 };
+        this.pendingEdgeAction = { type: 'reroll', cost: EDGE_COST_REROLL };
         this.showDieSelection();
     }
 
     initiateEdgeAddOneToDie() {
-        if (!this.currentRoll || this.edgePointsInput.value < 2) return;
-        
+        if (!this.currentRoll || this.edgePointsInput.value < EDGE_COST_ADD_ONE) return;
+
         const currentEdge = parseInt(this.edgePointsInput.value);
-        if (currentEdge < 2) {
-            alert('Not enough Edge points! Need 2 Edge.');
+        if (currentEdge < EDGE_COST_ADD_ONE) {
+            alert(`Not enough Edge points! Need ${EDGE_COST_ADD_ONE} Edge.`);
             return;
         }
 
         // Show die selection
-        this.pendingEdgeAction = { type: 'addOne', cost: 2 };
+        this.pendingEdgeAction = { type: 'addOne', cost: EDGE_COST_ADD_ONE };
         this.showDieSelection();
     }
 
@@ -811,17 +1057,17 @@ class ShadowrunDiceRoller {
     }
 
     useEdgeBuySuccess() {
-        if (!this.currentRoll || this.edgePointsInput.value < 3) return;
+        if (!this.currentRoll || this.edgePointsInput.value < EDGE_COST_BUY_SUCCESS) return;
 
         const currentEdge = parseInt(this.edgePointsInput.value);
-        if (currentEdge < 3) {
-            alert('Not enough Edge points! Need 3 Edge for an automatic success.');
+        if (currentEdge < EDGE_COST_BUY_SUCCESS) {
+            alert(`Not enough Edge points! Need ${EDGE_COST_BUY_SUCCESS} Edge for an automatic success.`);
             return;
         }
 
         // Buy one automatic success (SR6E: 3 Edge)
         this.currentRoll.hits += 1;
-        this.currentRoll.edgePoints = currentEdge - 3;
+        this.currentRoll.edgePoints = currentEdge - EDGE_COST_BUY_SUCCESS;
         this.currentRoll.boughtSuccess = true;
 
         // Update edge input
@@ -835,10 +1081,21 @@ class ShadowrunDiceRoller {
 
     addToHistory(roll) {
         this.rollHistory.unshift(roll);
-        if (this.rollHistory.length > 50) {
-            this.rollHistory = this.rollHistory.slice(0, 50);
+        if (this.rollHistory.length > MAX_HISTORY) {
+            this.rollHistory = this.rollHistory.slice(0, MAX_HISTORY);
         }
-        localStorage.setItem('shadowrunDiceHistory', JSON.stringify(this.rollHistory));
+        try {
+            localStorage.setItem('shadowrunDiceHistory', JSON.stringify(this.rollHistory));
+        } catch (error) {
+            console.error('Error saving to history:', error);
+            // Clear old history if storage is full
+            this.rollHistory = this.rollHistory.slice(0, 10);
+            try {
+                localStorage.setItem('shadowrunDiceHistory', JSON.stringify(this.rollHistory));
+            } catch (e) {
+                console.error('Still unable to save history');
+            }
+        }
         this.updateHistoryDisplay();
     }
 
@@ -872,22 +1129,130 @@ class ShadowrunDiceRoller {
         });
     }
 
+    rollOpposedAttacker() {
+        const pool = parseInt(this.attackerPool.value) || MIN_DICE_POOL;
+        if (pool < MIN_DICE_POOL || pool > MAX_DICE_POOL) {
+            alert(`Dice pool must be between ${MIN_DICE_POOL} and ${MAX_DICE_POOL}`);
+            return;
+        }
+
+        const roll = this.performRoll(pool, 0);
+        this.opposedRolls.attacker = roll;
+        this.displayOpposedResult(roll, this.attackerResult, 'Attacker');
+        this.updateOpposedOutcome();
+    }
+
+    rollOpposedDefender() {
+        const pool = parseInt(this.defenderPool.value) || MIN_DICE_POOL;
+        if (pool < MIN_DICE_POOL || pool > MAX_DICE_POOL) {
+            alert(`Dice pool must be between ${MIN_DICE_POOL} and ${MAX_DICE_POOL}`);
+            return;
+        }
+
+        const roll = this.performRoll(pool, 0);
+        this.opposedRolls.defender = roll;
+        this.displayOpposedResult(roll, this.defenderResult, 'Defender');
+        this.updateOpposedOutcome();
+    }
+
+    displayOpposedResult(roll, container, label) {
+        container.innerHTML = '';
+
+        const hitsDiv = document.createElement('div');
+        hitsDiv.className = 'opposed-result-hits';
+        hitsDiv.textContent = `${roll.hits} ${roll.hits === 1 ? 'Hit' : 'Hits'}`;
+        container.appendChild(hitsDiv);
+
+        const diceDiv = document.createElement('div');
+        diceDiv.className = 'opposed-result-dice';
+        roll.dice.forEach(die => {
+            const dieElement = document.createElement('div');
+            let dieClass = `die dice-${die.value === 1 ? '1' : die.value >= 5 ? die.value : '2-4'}`;
+            if (die.exploded) dieClass += ' exploded';
+            dieElement.className = dieClass;
+            dieElement.textContent = die.value;
+            diceDiv.appendChild(dieElement);
+        });
+        container.appendChild(diceDiv);
+
+        // Play sound if enabled
+        if (this.settings.enableSounds) {
+            this.playRollSound();
+        }
+    }
+
+    updateOpposedOutcome() {
+        if (!this.opposedRolls.attacker || !this.opposedRolls.defender) {
+            this.opposedOutcome.style.display = 'none';
+            this.resetOpposedBtn.style.display = 'none';
+            return;
+        }
+
+        const attackerHits = this.opposedRolls.attacker.hits;
+        const defenderHits = this.opposedRolls.defender.hits;
+        const netHits = attackerHits - defenderHits;
+
+        this.opposedOutcome.innerHTML = '';
+        this.opposedOutcome.style.display = 'block';
+        this.resetOpposedBtn.style.display = 'block';
+
+        const title = document.createElement('h3');
+        title.textContent = 'Outcome';
+        this.opposedOutcome.appendChild(title);
+
+        const netHitsDiv = document.createElement('div');
+        netHitsDiv.className = 'net-hits';
+
+        const outcomeText = document.createElement('div');
+        outcomeText.className = 'outcome-text';
+
+        if (netHits > 0) {
+            netHitsDiv.textContent = `${netHits} Net ${netHits === 1 ? 'Hit' : 'Hits'}`;
+            netHitsDiv.style.color = 'var(--success)';
+            outcomeText.textContent = 'Attacker Succeeds!';
+        } else if (netHits < 0) {
+            netHitsDiv.textContent = `${Math.abs(netHits)} Net ${Math.abs(netHits) === 1 ? 'Hit' : 'Hits'}`;
+            netHitsDiv.style.color = 'var(--glitch)';
+            outcomeText.textContent = 'Defender Succeeds!';
+        } else {
+            netHitsDiv.textContent = 'Tie';
+            netHitsDiv.style.color = 'var(--text-secondary)';
+            outcomeText.textContent = 'Both sides rolled equal hits';
+        }
+
+        this.opposedOutcome.appendChild(netHitsDiv);
+        this.opposedOutcome.appendChild(outcomeText);
+    }
+
+    resetOpposedRoll() {
+        this.opposedRolls.attacker = null;
+        this.opposedRolls.defender = null;
+        this.attackerResult.innerHTML = '';
+        this.defenderResult.innerHTML = '';
+        this.opposedOutcome.style.display = 'none';
+        this.resetOpposedBtn.style.display = 'none';
+    }
+
     playRollSound() {
         // Simple beep sound using Web Audio API
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
+        // Create audio context only once to prevent memory leaks
+        if (!this.audioContext) {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        const oscillator = this.audioContext.createOscillator();
+        const gainNode = this.audioContext.createGain();
 
         oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        gainNode.connect(this.audioContext.destination);
 
         oscillator.frequency.value = 800;
         oscillator.type = 'sine';
-        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.1, this.audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.1);
 
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.1);
+        oscillator.start(this.audioContext.currentTime);
+        oscillator.stop(this.audioContext.currentTime + 0.1);
     }
 }
 

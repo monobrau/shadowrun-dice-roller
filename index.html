@@ -158,6 +158,18 @@
             </div>
         </div>
 
+        <div class="presets-panel">
+            <button class="presets-toggle" id="presetsToggle" aria-expanded="false">
+                <span>📋</span> Roll Presets
+            </button>
+            <div class="presets-content" id="presetsContent">
+                <div class="presets-actions">
+                    <button id="savePresetBtn" class="btn-secondary">💾 Save Current Roll as Preset</button>
+                </div>
+                <div id="presetsList" class="presets-list"></div>
+            </div>
+        </div>
+
         <main class="roll-interface">
             <div class="input-section">
                 <div class="input-group">
@@ -198,6 +210,37 @@
                 <div class="roll-summary" id="rollSummary"></div>
             </div>
         </main>
+
+        <section class="opposed-rolls-section">
+            <button class="opposed-toggle" id="opposedToggle" aria-expanded="false">
+                <span>⚔️</span> Opposed Roll
+            </button>
+            <div class="opposed-content" id="opposedContent">
+                <div class="opposed-grid">
+                    <div class="opposed-player">
+                        <h3>Attacker</h3>
+                        <div class="input-group">
+                            <label for="attackerPool">Dice Pool:</label>
+                            <input type="number" id="attackerPool" min="1" max="99" value="6">
+                        </div>
+                        <button id="rollAttacker" class="btn-secondary">Roll Attacker</button>
+                        <div id="attackerResult" class="opposed-result"></div>
+                    </div>
+                    <div class="opposed-divider"></div>
+                    <div class="opposed-player">
+                        <h3>Defender</h3>
+                        <div class="input-group">
+                            <label for="defenderPool">Dice Pool:</label>
+                            <input type="number" id="defenderPool" min="1" max="99" value="6">
+                        </div>
+                        <button id="rollDefender" class="btn-secondary">Roll Defender</button>
+                        <div id="defenderResult" class="opposed-result"></div>
+                    </div>
+                </div>
+                <div id="opposedOutcome" class="opposed-outcome" style="display: none;"></div>
+                <button id="resetOpposed" class="btn-secondary" style="margin-top: 15px; width: 100%; display: none;">Reset Opposed Roll</button>
+            </div>
+        </section>
 
         <section class="roll-history">
             <h2>Roll History</h2>
